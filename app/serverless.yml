@@ -1,0 +1,103 @@
+service: testPervsys
+
+frameworkVersion: "2"
+
+disabledDeprecations:
+  - CONFIG_VALIDATION_MODE_DEFAULT
+
+plugins:
+  - serverless-python-requirements
+  - serverless-s3-remover
+  - serverless-dotenv-plugin
+
+custom:
+  tableName: 'BlobsTable'
+  s3_bucket: 'blobs-bucket-s3-uploader'
+  s3_bucket_arn: arn:aws:s3:::${self:custom.s3_bucket}
+  remover:
+    buckets:
+      - ${self:custom.s3_bucket}
+
+provider:
+  name: aws
+  runtime: python3.8
+  lambdaHashingVersion: '20201221'
+  stage: test
+  region: eu-central-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:*
+      Resource: ${self:custom.s3_bucket_arn}
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": [ "BlobsDynamoDBTable", "Arn" ] }
+    - Effect: "Allow"
+      Action:
+        - "rekognition:*"
+      Resource: "*"
+  environment:
+    BLOBS_TABLE: ${self:custom.tableName}
+    S3_BUCKET: ${self:custom.s3_bucket}
+    S3_BUCKET_ARN: ${self:custom.s3_bucket_arn}
+
+
+functions:
+  getUser:
+    handler: getblobs.get_blob
+    events:
+      - http:
+          path: blobs/{blob_id}
+          method: get
+  createUser:
+    handler: postblobs.create_blob
+    events:
+      - http:
+          path: blobs
+          method: post
+
+  labelOnS3Upload:
+    handler: S3UploadHandler.labelOnS3Upload
+    events:
+      - s3:
+          bucket: ${self:provider.environment.S3_BUCKET}
+          event: s3:ObjectCreated:Put
+          existing: true
+
+resources:
+  Resources:
+    BlobsDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: blob_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: blob_id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
+    BlobsS3Bucket:
+      Type: 'AWS::S3::Bucket'
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKET}
+    BucketPolicy:
+      Type: 'AWS::S3::BucketPolicy'
+      Properties:
+        Bucket: ${self:provider.environment.S3_BUCKET}
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: { "AWS": "${self:provider.environment.USER_ARN}" }
+              Action: s3:*
+              Resource: [ "arn:aws:s3:::${self:provider.environment.S3_BUCKET}","arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*" ]
