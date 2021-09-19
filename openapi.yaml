@@ -3,7 +3,7 @@ info:
   title: Recognition API
   version: 1.0.0
 servers:
-- url: https://3iwe8oxx58.execute-api.eu-central-1.amazonaws.com/dev
+- url: <your service url>
 tags:
 - name: blobs
   description: Blobs endpoints
