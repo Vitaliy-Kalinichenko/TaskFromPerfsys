@@ -108,10 +108,12 @@ This api implements two endpoints
 - POST .../blobs
 - GET .../blobs/{blob_id}
 
+When use POST endpoint, the request body must contain a callback url where you expect the result of the service.
 ### Get image pre-signed upload URL
 
 ```bash
-$ curl -H "Content-Type: application/json" -X POST https://xxxxxxx.execute-api.eu-central-1.amazonaws.com/test/blobs
+$ curl -H "Content-Type: application/json" -X -d '{"callback_url": "http://your_callback_url.com"}' 
+POST https://xxxxxxx.execute-api.eu-central-1.amazonaws.com/dev/blobs
 ```
 
 Response API for POST request
@@ -119,25 +121,27 @@ Response API for POST request
 ```bash
 {
     "blob_id": "d224aff1-2d15-47b8-a4c1-c44ea068715b",
-    "presigned_url": "https://blobs-bucket-s3-uploader.s3.amazonaws.com/d224aff1-2d15-47b8-a4c1-c44ea068715b?..."
+    "callback_url": "http://your_callback_url.com",
+    "upload_url": "https://blobs-bucket-s3-uploader.s3.amazonaws.com/d224aff1-2d15-47b8-a4c1-c44ea068715b?..."
 }
 ```
 
 > ```"blob_id"```: id records in the DynamoDB database where the result of the work will be recorded images recognition.  
-```"presigned_url"```: the link where the client uploading image for recognition. Put request type. The link is valid for 5 min.
+```"callback_url"```: url for callback when the result of image recognition is ready  
+```"upload_url"```: the link where the client uploading image for recognition. Put request type. The link is valid for 5 min.
 >
 
 ### Upload a file to the URL
 
 ```bash
-$ curl --location --request PUT "<presigned_url>" --header 'Content-Type: image/jpeg' --data-binary 'file-path'
+$ curl --location --request PUT "<upload_url>" --header 'Content-Type: image/jpeg' --data-binary 'file-path'
 ```
 
 ### Response API for GET requests
 
 ```bash
 $ curl -H "Content-Type: application/json" -X GET  https://xxxxxxx.exe
-cute-api.eu-central-1.amazonaws.com/test/blobs/d224aff1-2d15-47b8-a4c1-c44ea068715b
+cute-api.eu-central-1.amazonaws.com/dev/blobs/d224aff1-2d15-47b8-a4c1-c44ea068715b
 {
     "blob_id": "d224aff1-2d15-47b8-a4c1-c44ea068715b",
     "labels": [

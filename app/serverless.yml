@@ -1,4 +1,4 @@
-service: testPervsys
+service: testfrompervsys
 
 frameworkVersion: "2"
 
@@ -9,10 +9,9 @@ plugins:
   - serverless-python-requirements
   - serverless-s3-remover
   - serverless-dotenv-plugin
-
 custom:
-  tableName: 'BlobsTable'
-  s3_bucket: 'blobs-bucket-s3-uploader'
+  tableName: ${self:service}-${opt:stage, self:provider.stage}
+  s3_bucket: ${self:service}${self:provider.stage}
   s3_bucket_arn: arn:aws:s3:::${self:custom.s3_bucket}
   remover:
     buckets:
@@ -22,7 +21,7 @@ provider:
   name: aws
   runtime: python3.8
   lambdaHashingVersion: '20201221'
-  stage: test
+  stage: dev
   region: eu-central-1
   iamRoleStatements:
     - Effect: Allow
@@ -50,13 +49,13 @@ provider:
 
 
 functions:
-  getUser:
+  get:
     handler: getblobs.get_blob
     events:
       - http:
           path: blobs/{blob_id}
           method: get
-  createUser:
+  post:
     handler: postblobs.create_blob
     events:
       - http:
@@ -70,6 +69,18 @@ functions:
           bucket: ${self:provider.environment.S3_BUCKET}
           event: s3:ObjectCreated:Put
           existing: true
+
+  db_record:
+    handler: callbacks.db_record
+    events:
+      - stream:
+          type: dynamodb
+          batchSize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - BlobsDynamoDBTable
+              - StreamArn
 
 resources:
   Resources:
@@ -86,6 +97,8 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         TableName: ${self:custom.tableName}
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
     BlobsS3Bucket:
       Type: 'AWS::S3::Bucket'
       Properties:
